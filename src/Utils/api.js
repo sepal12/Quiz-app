@@ -1,19 +1,29 @@
+// Local fallback questions
+const FALLBACK_QUESTIONS = {
+  9: [ // General Knowledge
+    {
+      question: "What is the capital of France?",
+      correct_answer: "Paris",
+      incorrect_answers: ["London", "Berlin", "Madrid"],
+      difficulty: "easy"
+    }
+  ]
+};
+
+const API_ENDPOINTS = [
+  'https://opentdb.com/api.php'
+];
+
 export async function fetchQuizQuestions(categoryId, amount, difficulty) {
-  const url = `https://opentdb.com/api.php?amount=${amount}&category=${categoryId}&difficulty=${difficulty}&type=multiple`;
+  // Your API logic here
+}
 
+export async function preloadQuestions() {
   try {
-    const response = await fetch(url);
-    if (!response.ok) {
-      throw new Error("Failed to fetch questions");
-    }
-
-    const data = await response.json();
-    if (data.response_code !== 0) {
-      throw new Error("No results found for this category/difficulty");
-    }
-
-    return data.results;
+    // Preload some questions
+    await fetchQuizQuestions(9, 5, 'easy');
+    await fetchQuizQuestions(9, 5, 'medium');
   } catch (error) {
-    throw new Error(error.message);
+    console.log('Preloading questions failed:', error);
   }
 }

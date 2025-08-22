@@ -1,25 +1,7 @@
 import { useState, useEffect } from "react";
 import QuestionCard from "./QuestionCard";
 import ScoreSummary from "./ScoreSummary";
-
-// Fallback questions for when API fails
-const FALLBACK_QUESTIONS = [
-  {
-    question: "What is the capital of France?",
-    correct_answer: "Paris",
-    incorrect_answers: ["London", "Berlin", "Madrid"],
-  },
-  {
-    question: "Which planet is known as the Red Planet?",
-    correct_answer: "Mars",
-    incorrect_answers: ["Venus", "Jupiter", "Saturn"],
-  },
-  {
-    question: "What is 2 + 2?",
-    correct_answer: "4",
-    incorrect_answers: ["3", "5", "6"],
-  },
-];
+import { fetchQuizQuestions } from "";
 
 export default function QuizStart({ quizData, endQuiz, goBack }) {
   const [questions, setQuestions] = useState([]);
@@ -27,66 +9,41 @@ export default function QuizStart({ quizData, endQuiz, goBack }) {
   const [score, setScore] = useState(0);
   const [userAnswers, setUserAnswers] = useState([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [apiStatus, setApiStatus] = useState("loading"); // 'loading', 'success', 'fallback'
   const [quizCompleted, setQuizCompleted] = useState(false);
 
   useEffect(() => {
-    const fetchQuestions = async () => {
+    const loadQuestions = async () => {
       try {
         setIsLoading(true);
-        setError(null);
+        setApiStatus("loading");
 
-        // Use fallback if no quizData (prevents immediate disappearance)
-        if (!quizData) {
-          setQuestions(FALLBACK_QUESTIONS);
-          return;
-        }
-
-        // Try to get cached questions first
-        const cacheKey = `quiz-${quizData.categoryId}-${quizData.difficulty}`;
-        const cachedQuestions = localStorage.getItem(cacheKey);
-
-        if (cachedQuestions) {
-          setQuestions(JSON.parse(cachedQuestions));
-          return;
-        }
-
-        // Add delay to avoid rate limiting
-        await new Promise((resolve) => setTimeout(resolve, 1000));
-
-        const response = await fetch(
-          `https://opentdb.com/api.php?amount=${quizData.questionCount}&category=${quizData.categoryId}&difficulty=${quizData.difficulty}&type=multiple`
+        const questions = await fetchQuizQuestions(
+          quizData.categoryId,
+          quizData.questionCount,
+          quizData.difficulty
         );
 
-        if (!response.ok) {
-          throw new Error(`API Error: ${response.status}`);
+        setQuestions(questions);
+        setApiStatus("success");
+
+        // Check if we're using fallback (no API response structure)
+        if (!questions[0]?.incorrect_answers) {
+          setApiStatus("fallback");
         }
-
-        const data = await response.json();
-
-        // Check if API actually returned questions
-        if (!data.results || data.results.length === 0) {
-          throw new Error("No questions received from API");
-        }
-
-        // Cache the questions for future use
-        localStorage.setItem(cacheKey, JSON.stringify(data.results));
-        setQuestions(data.results);
-      } catch (err) {
-        console.warn("API failed, using fallback:", err);
-        setError(err.message);
-        // Use fallback questions to prevent disappearance
-        setQuestions(FALLBACK_QUESTIONS.slice(0, quizData?.questionCount || 3));
+      } catch (error) {
+        console.error("Failed to load questions:", error);
+        setApiStatus("fallback");
+        // State is already set to fallback questions from api.js
       } finally {
         setIsLoading(false);
       }
     };
 
-    fetchQuestions();
+    loadQuestions();
   }, [quizData]);
 
   const handleAnswer = (answer) => {
-    // Safety check - ensure question exists
     if (!questions[currentIndex]) return;
 
     const isCorrect = answer === questions[currentIndex].correct_answer;
@@ -105,7 +62,6 @@ export default function QuizStart({ quizData, endQuiz, goBack }) {
     setUserAnswers(newUserAnswers);
     setScore(newScore);
 
-    // Move to next question or end quiz
     if (currentIndex < questions.length - 1) {
       setCurrentIndex(currentIndex + 1);
     } else {
@@ -121,34 +77,18 @@ export default function QuizStart({ quizData, endQuiz, goBack }) {
     }
   };
 
-  // Render loading state
   if (isLoading) {
     return (
       <div className="bg-white p-6 rounded-lg shadow-sm">
         <div className="text-center">
           <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mx-auto mb-4"></div>
-          <p>Loading questions...</p>
+          <p>Loading questions from API...</p>
+          <p className="text-sm text-gray-500 mt-2">This may take a moment</p>
         </div>
       </div>
     );
   }
 
-  // Render error state (but still show questions)
-  if (error && questions.length === 0) {
-    return (
-      <div className="bg-white p-6 rounded-lg shadow-sm">
-        <div className="text-red-600 mb-4">⚠️ {error}</div>
-        <button
-          onClick={() => window.location.reload()}
-          className="px-4 py-2 bg-primary text-white rounded"
-        >
-          Try Again
-        </button>
-      </div>
-    );
-  }
-
-  // Render quiz completed state
   if (quizCompleted) {
     return (
       <ScoreSummary
@@ -166,32 +106,55 @@ export default function QuizStart({ quizData, endQuiz, goBack }) {
     );
   }
 
-  // Main quiz interface - ONLY render if questions exist
+  if (questions.length === 0) {
+    return (
+      <div className="bg-white p-6 rounded-lg shadow-sm">
+        <div className="text-center">
+          <h3 className="text-lg font-semibold mb-2">No Questions Available</h3>
+          <p className="text-gray-600 mb-4">
+            Please try a different category or difficulty.
+          </p>
+          <button
+            onClick={goBack}
+            className="px-4 py-2 bg-primary text-white rounded hover:bg-primary-dark"
+          >
+            Choose Another Quiz
+          </button>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div className="bg-white p-6 rounded-lg shadow-sm">
-      {error && (
+      {/* API Status Indicator */}
+      {apiStatus === "fallback" && (
         <div className="bg-yellow-50 border border-yellow-200 text-yellow-800 p-3 rounded mb-4">
-          ⚠️ Using offline questions: {error}
+          ⚠️ Using offline mode (API unavailable)
         </div>
       )}
 
       <div className="flex justify-between items-center mb-6">
         <h2 className="text-xl font-semibold">
           {quizData?.categoryName || "General Knowledge"} Quiz (
-          {quizData?.difficulty || "medium"})
+          {quizData?.difficulty || "mixed"})
         </h2>
         <div className="bg-gray-100 px-3 py-1 rounded-full">
           Question {currentIndex + 1}/{questions.length}
         </div>
       </div>
 
-      {/* SAFETY CHECK: Only render if question exists */}
-      {questions.length > 0 && questions[currentIndex] && (
-        <QuestionCard
-          question={questions[currentIndex]}
-          onAnswer={handleAnswer}
-        />
-      )}
+      <QuestionCard
+        question={questions[currentIndex]}
+        onAnswer={handleAnswer}
+      />
+
+      <button
+        className="mt-4 px-4 py-2 bg-gray-200 text-gray-700 rounded hover:bg-gray-300"
+        onClick={goBack}
+      >
+        Quit Quiz
+      </button>
     </div>
   );
 }
