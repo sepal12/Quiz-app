@@ -1,3 +1,4 @@
+import { fetchQuizQuestions} from ".api.js";
 // Local fallback questions
 const FALLBACK_QUESTIONS = {
   9: [ // General Knowledge
