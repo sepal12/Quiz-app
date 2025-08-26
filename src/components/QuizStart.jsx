@@ -1,7 +1,9 @@
-import { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import QuestionCard from "./QuestionCard";
 import ScoreSummary from "./ScoreSummary";
 import { fetchQuizQuestions } from "";
+
+console.log("QuizStart component loaded");
 
 export default function QuizStart({ quizData, endQuiz, goBack }) {
   const [questions, setQuestions] = useState([]);
@@ -13,6 +15,8 @@ export default function QuizStart({ quizData, endQuiz, goBack }) {
   const [quizCompleted, setQuizCompleted] = useState(false);
 
   useEffect(() => {
+    console.log("QuizStart useEffect running", quizData);
+
     const loadQuestions = async () => {
       try {
         setIsLoading(true);
